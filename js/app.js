@@ -3,24 +3,24 @@ document.addEventListener('DOMContentLoaded', (event) => {
     for (let i = 0; i < 2000; i++) data.push([]);
 
     // srcProvinces chứa toàn bộ các giá trị có thể hiển thị ở ô dropdown Tỉnh Thành Phố
-    // cách tính: lấy object province_mapping tách lấy field name
+    // cách tính: tách lấy field name từ dbProvinces
     let srcProvinces = []
-    for (const v of Object.values(province_mapping)) {
+    for (let v of Object.values(dbProvinces)) {
       srcProvinces.push(v['name'])
       // srcProvinces.push(JSON.stringify(v))
     }
 
     // srcDistricts chứa toàn bộ các giá trị có thể hiển thị ở ô dropdown Quận Huyện
-    // cách tính: lấy object district_mapping tách lấy field name
+    // cách tính: tách lấy field name từ dbDistricts
     let srcDistricts = []
-    for (const v of Object.values(district_mapping)) {
+    for (let v of Object.values(dbDistricts)) {
       srcDistricts.push(v['name'])
     }
 
     // srcWards chứa toàn bộ các giá trị có thể hiển thị ở ô dropdown Phường Xã
-    // cách tính: lấy object ward_mapping tách lấy field name
+    // cách tính: tách lấy field name từ dbWards
     let srcWards = []
-    for (const v of Object.values(ward_mapping)) {
+    for (let v of Object.values(dbWards)) {
       srcWards.push(v['name'])
     }
 
@@ -79,9 +79,9 @@ const onCellChanged = (instance, cell, x, y, value) => {
   // lấy kết quả từ function tách địa chỉ
   let result = parseAddress(value);
   // hiển thị giá trị fields name của các object province, district, ward lên trang tính
-  $(instance).jexcel("setValue", "F" + row, result.province['name']);
-  $(instance).jexcel("setValue", "G" + row, result.district['name']);
-  $(instance).jexcel("setValue", "H" + row, result.ward['name']);
+  $(instance).jexcel("setValue", "F" + row, result['province']);
+  $(instance).jexcel("setValue", "G" + row, result['district']);
+  $(instance).jexcel("setValue", "H" + row, result['ward']);
 
   // Set timer lưu data tự động từ bảng tính vào localStorage
   let saveTimer;
@@ -112,25 +112,25 @@ const parseAddress = inputAddress => {
   let foundedDistrict = "";
   let foundedWard = "";
 
+  let chooseWord = "";
   let largestIndex = -1;
-  let chooseItem = null;
 
   // Tách Tỉnh Thành Phố
-  for (let provinceObject of dbProvinces) {
-    for (let item of provinceObject['set_province']) {
+  for (let province of Object.keys(dbProvinces)) {
+    for (let word of dbProvinces[province]['words']) {
       if (
           // chọn lấy thành phần(tỉnh, huyện, xã) gần nhất tính từ bên phải address
-          (address.lastIndexOf(item) > largestIndex) || 
+          (address.lastIndexOf(word) > largestIndex) || 
           // nếu có 2 thành phần cùng index => ưu tiên chuỗi dài hơn
           (
-            (address.lastIndexOf(item) === largestIndex) && 
+            (address.lastIndexOf(word) === largestIndex) && 
             (largestIndex > -1) && 
-            (item.length > chooseItem.length)
+            (word.length > chooseWord.length)
           )
         ) {
-        foundedProvince = provinceObject['province'];
-        chooseItem = item;
-        largestIndex = address.lastIndexOf(item);
+        foundedProvince = province, // dbProvinces[province]['name'];
+        chooseWord = word;
+        largestIndex = address.lastIndexOf(word);
       }
     }
   }
@@ -138,101 +138,98 @@ const parseAddress = inputAddress => {
   // Nếu tìm thấy Tỉnh Thành Phố, tách bỏ phần Tỉnh Thành Phố khỏi địa chỉ đang tách 
   // (chỉ tách bỏ phần sau cùng)
   if (foundedProvince != "") {
-    address = replace_last_occurrences(address, chooseItem, "");
+    address = replace_last_occurrences(address, chooseWord, "");
   }
 
+  chooseWord = "";
   largestIndex = -1;
-  chooseItem = null;
-
+  
   // Tách Quận Huyện khi đã tách được Tỉnh Thành Phố
   if (foundedProvince != "") {
-    let filterDistricts = province_mapping_district.filter(item => item['province'] === foundedProvince)[0]['district'];
-    for (let district of filterDistricts) {
-      let filterDbDistricts = dbDistricts.filter(item => item['district'] === district)[0]
-      for (let item of filterDbDistricts['set_district']) {
-        const reg_item = new RegExp(`${item}${SPECIAL_ENDING}`, 'g');
+    for (let district of dbProvinces[foundedProvince]['district']) {
+      for (let word of dbDistricts[district]['words']) {
+        const reg_word = new RegExp(`${word}${SPECIAL_ENDING}`, 'g');
         if (
-            (last_index_of_regex(address, reg_item) > largestIndex) || 
+            (last_index_of_regex(address, reg_word) > largestIndex) || 
             (
-              (last_index_of_regex(address, reg_item) === largestIndex) && 
+              (last_index_of_regex(address, reg_word) === largestIndex) && 
               (largestIndex > -1) && 
-              (item.length > chooseItem.length)
+              (word.length > chooseWord.length)
             )
           ){
           foundedDistrict = district;
-          chooseItem = item;
-          largestIndex = last_index_of_regex(address, reg_item);
+          chooseWord = word;
+          largestIndex = last_index_of_regex(address, reg_word);
         }
       }
     }
   } else {
     // Tách Quận Huyện khi trong chuỗi địa chỉ không có Tỉnh Thành Phố (suy ngược từ Quận Huyện => Tỉnh Thành Phố)
-    for (let dbDistrict of dbDistricts) {
-      for (let item of dbDistrict['set_district']) {
-        const reg_item = new RegExp(item, 'g');
-        // const reg_item = new RegExp(`${item}${SPECIAL_ENDING}`, 'g'); (2)
+    for (let district of Object.keys(dbDistricts)) {
+      for (let word of dbDistricts[district]['words']) {
+        const reg_word = new RegExp(word, 'g');
+        // const reg_word = new RegExp(`${word}${SPECIAL_ENDING}`, 'g'); (2)
         // 439/97/14 Tổ 21Khu Phố 1,phường Tân Thới Hiệp Quận 12Tphcm => (2) bat ko duoc
         if (
-            (last_index_of_regex(address, reg_item) > largestIndex) || 
+            (last_index_of_regex(address, reg_word) > largestIndex) || 
             (
-              (last_index_of_regex(address, reg_item) === largestIndex) && 
+              (last_index_of_regex(address, reg_word) === largestIndex) && 
               (largestIndex > -1) && 
-              (item.length > chooseItem.length)
+              (word.length > chooseWord.length)
             )
           ){
-          foundedDistrict = dbDistrict['district'];
-          chooseItem = item;
-          largestIndex = last_index_of_regex(address, reg_item);
+          foundedDistrict = district;
+          chooseWord = word;
+          largestIndex = last_index_of_regex(address, reg_word);
         }
       }
     }
   }
 
   if (foundedDistrict != "") {
-    address = replace_last_occurrences(address, chooseItem, "");
+    address = replace_last_occurrences(address, chooseWord, "");
     if (foundedProvince === "") {
-      foundedProvince = province_mapping_district.filter(item => item['district'].includes(foundedDistrict))[0]['province'];
+      provinceId = dbDistricts[foundedDistrict]['province']
+      foundedProvince = Object.entries(dbProvinces).filter(([key, value]) => value['id'] === provinceId)[0][0]
     }
   }
 
   largestIndex = -1;
-  chooseItem = null;
+  chooseWord = "";
 
   // Tách Phường Xã
   if (foundedDistrict != "") {
-    let filterWards = district_mapping_ward.filter(item => item['district'] === foundedDistrict)[0];
-    for (let ward of filterWards['ward']) {
-      let filterDbWards = dbWards.filter(item => item['ward'] === ward)[0]
-      for (let item of filterDbWards['set_ward']) {
-        const reg_item = new RegExp(`${item}${SPECIAL_ENDING}`, 'g');
+    for (let ward of dbDistricts[foundedDistrict]['ward']) {
+      for (let word of dbWards[ward]['words']) {
+        const reg_word = new RegExp(`${word}${SPECIAL_ENDING}`, 'g');
         if (
-            (last_index_of_regex(address, reg_item) > largestIndex) || 
+            (last_index_of_regex(address, reg_word) > largestIndex) || 
             (
-              (last_index_of_regex(address, reg_item) === largestIndex) && 
+              (last_index_of_regex(address, reg_word) === largestIndex) && 
               (largestIndex > -1) && 
-              (item.length > chooseItem.length)
+              (word.length > chooseWord.length)
             )
           ){
           foundedWard = ward;
-          chooseItem = item;
-          largestIndex = last_index_of_regex(address, reg_item);
+          chooseWord = word;
+          largestIndex = last_index_of_regex(address, reg_word);
         }
       }
     }
     if (foundedWard != "") { 
-      address = replace_last_occurrences(address, chooseItem, "");
+      address = replace_last_occurrences(address, chooseWord, "");
     }
   }
 
   // Mapping lại kết quả Tỉnh Thành Phố, Quận Huyện, Phường Xã
   if (foundedProvince != "") {
-    foundedProvince = province_mapping[foundedProvince]
+    foundedProvince = dbProvinces[foundedProvince]['name']
   }
   if (foundedDistrict != "") {
-    foundedDistrict = district_mapping[foundedDistrict]
+    foundedDistrict = dbDistricts[foundedDistrict]['name']
   }
   if (foundedWard != "") {
-    foundedWard = ward_mapping[foundedWard]
+    foundedWard = dbWards[foundedWard]['name']
   }
   return {
     province: foundedProvince,

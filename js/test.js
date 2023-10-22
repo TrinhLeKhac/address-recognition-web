@@ -1,4 +1,4 @@
-const inputAddress = "237/48Duong Phạm Vang Chieu Ph14Go Vấp Tp Hồ Chí Minh.";
+const inputAddress = "707 Đỗ Xuân Hợp, Phường Phú Hữu, Quận 9, Thủ Đức, Hcm";
 console.log(`full address: ${inputAddress}`)
 
 let address = cleanFullAddress(inputAddress) + ',';
@@ -10,71 +10,69 @@ let foundedDistrict = "";
 let foundedWard = "";
 
 let largestIndex = -1;
-let chooseItem = null;
-let chooseProvince = null;
+let chooseWord = "";
+let chooseProvince = "";
 
-for (let provinceObject of dbProvinces) {
-  for (let item of provinceObject['set_province']) {
+for (let province of Object.keys(dbProvinces)) {
+  for (let word of dbProvinces[province]['words']) {
     // chọn lấy thành phần(tỉnh, huyện, xã) gần nhất tính từ bên phải address
     // nếu có 2 thành phần cùng index => ưu tiên chuỗi dài hơn
     // trong dbDistricts, dbProvinces, dbWards có từ viết tắt, ưu tiên chuỗi đầy đủ(dài hơn) trước 
-    if ((address.lastIndexOf(item) > largestIndex) || (
-      (address.lastIndexOf(item) === largestIndex) && (largestIndex > -1) && (item.length > chooseItem.length)
+    if ((address.lastIndexOf(word) > largestIndex) || (
+      (address.lastIndexOf(word) === largestIndex) && (largestIndex > -1) && (word.length > chooseWord.length)
     )) {
-      foundedProvince = provinceObject['province'];
-      chooseItem = item;
-      largestIndex = address.lastIndexOf(item);
+      foundedProvince = province;
+      chooseWord = word;
+      largestIndex = address.lastIndexOf(word);
     }
   }
 }
 if (foundedProvince != "") {
-  address = replace_last_occurrences(address, chooseItem, "");
+  address = replace_last_occurrences(address, chooseWord, "");
 }
 
-console.log(chooseItem);
+console.log(chooseWord);
 console.log(address);
 console.log(foundedProvince);
 console.log('\n');
 
 
 largestIndex = -1;
-chooseItem = null;
+chooseWord = "";
 
 if (foundedProvince != "") {
-  let filterDistricts = province_mapping_district.filter(item => item['province'] === foundedProvince)[0]['district'];
-  for (let district of filterDistricts) {
-    let filterDbDistricts = dbDistricts.filter(item => item['district'] === district)[0]
-    // console.log(filterDbDistricts);
-    for (let item of filterDbDistricts['set_district']) {
-      const reg_item = new RegExp(`${item}${SPECIAL_ENDING}`, 'g');
-      if ((last_index_of_regex(address, reg_item) > largestIndex) || (
-        (last_index_of_regex(address, reg_item) === largestIndex) && (largestIndex > -1) && (item.length > chooseItem.length)
+  for (let district of dbProvinces[foundedProvince]['district']) {
+    for (let word of dbDistricts[district]['words']) {
+      const reg_word= new RegExp(`${word}${SPECIAL_ENDING}`, 'g');
+      if ((last_index_of_regex(address, reg_word) > largestIndex) || (
+        (last_index_of_regex(address, reg_word) === largestIndex) && (largestIndex > -1) && (word.length > chooseWord.length)
       )){
         foundedDistrict = district;
-        chooseItem = item;
-        largestIndex = last_index_of_regex(address, reg_item);
+        chooseWord = word;
+        largestIndex = last_index_of_regex(address, reg_word);
       }
     }
   }
 } else {
-  for (let dbDistrict of dbDistricts) {
-    for (let item of dbDistrict['set_district']) {
-      const reg_item = new RegExp(item, 'g');
-      if ((last_index_of_regex(address, reg_item) > largestIndex) || (
-        (last_index_of_regex(address, reg_item) === largestIndex) && (largestIndex > -1) && (item.length > chooseItem.length)
+  for (let district of Object.keys(dbDistricts)) {
+    for (let word of dbDistrict[district]['words']) {
+      const reg_word = new RegExp(word, 'g');
+      if ((last_index_of_regex(address, reg_word) > largestIndex) || (
+        (last_index_of_regex(address, reg_word) === largestIndex) && (largestIndex > -1) && (word.length > chooseWord.length)
       )) {
-        foundedDistrict = dbDistrict['district'];
-        chooseItem = item;
-        largestIndex = last_index_of_regex(address, reg_item);
+        foundedDistrict = district;
+        chooseWord = word;
+        largestIndex = last_index_of_regex(address, reg_word);
       }
     }
   }
 }
 
 if (foundedDistrict != "") {
-  address = replace_last_occurrences(address, chooseItem, "");
+  address = replace_last_occurrences(address, chooseWord, "");
   if (foundedProvince === "") {
-    foundedProvince = province_mapping_district.filter(item => item['district'].includes(foundedDistrict))[0]['province'];
+    provinceId = dbDistricts[foundedDistrict]['province']
+    foundedProvince = Object.entries(dbProvinces).filter(([key, value]) => value['id'] === provinceId)[0][0];
   }
   console.log(foundedDistrict);
   console.log(address);
@@ -83,35 +81,36 @@ if (foundedDistrict != "") {
 console.log('\n');
 
 largestIndex = -1;
-chooseItem = null;
+chooseWord = "";
 
 if (foundedDistrict != "") {
-  let filterWards = district_mapping_ward.filter(item => item['district'] === foundedDistrict)[0];
-  console.log(filterWards);
-  for (let ward of filterWards['ward']) {
-    // console.log(ward);
-    let filterDbWards = dbWards.filter(item => item['ward'] === ward)[0]
-    // console.log(filterDbWards);
-    for (let item of filterDbWards['set_ward']) {
-      // console.log(item)
-      const reg_item = new RegExp(`${item}${SPECIAL_ENDING}`, 'g');
-      if (last_index_of_regex(address, reg_item) > largestIndex) {
+  for (let ward of dbDistricts[foundedDistrict]['ward']) {
+    for (let word of dbWards[ward]['words']) {
+      const reg_word = new RegExp(`${word}${SPECIAL_ENDING}`, 'g');
+      if (last_index_of_regex(address, reg_word) > largestIndex) {
         foundedWard = ward;
-        chooseItem = item;
-        largestIndex = last_index_of_regex(address, reg_item);
+        chooseWord = word;
+        largestIndex = last_index_of_regex(address, reg_word);
       }
     }
   }
   if (foundedWard != "") {
-    address = replace_last_occurrences(address, chooseItem, "");
-    console.log(chooseItem);
+    address = replace_last_occurrences(address, chooseWord, "");
+    console.log(chooseWord);
     console.log(address);
     console.log(foundedWard);
   }
 }
-foundedProvince = province_mapping[foundedProvince]
-foundedDistrict = district_mapping[foundedDistrict]
-foundedWard = ward_mapping[foundedWard]
+
+if (foundedProvince != "") {
+  foundedProvince = dbProvinces[foundedProvince]['name']
+}
+if (foundedDistrict != "") {
+  foundedDistrict = dbDistricts[foundedDistrict]['name']
+}
+if (foundedWard != "") {
+  foundedWard = dbWards[foundedWard]['name']
+}
 
 console.log(foundedProvince)
 console.log(foundedDistrict)
