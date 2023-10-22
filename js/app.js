@@ -140,6 +140,9 @@ const parseAddress = inputAddress => {
   if (foundedProvince != "") {
     address = replace_last_occurrences(address, chooseWord, "");
   }
+  if (address.endsWith("Thanh Pho ,")) {
+    address = address.replace("Thanh Pho ,", "")
+  }
 
   chooseWord = "";
   largestIndex = -1;
